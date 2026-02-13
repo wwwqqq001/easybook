@@ -1,22 +1,50 @@
-name: Build EasyBook
+name: Build iOS IPA (TrollStore)
 
 on:
   push:
     branches: [ main, master ]
-  pull_request:
-    branches: [ main, master ]
+  workflow_dispatch:
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
+  build-ios:
+    runs-on: macos-latest
 
     steps:
     - uses: actions/checkout@v4
+
     - name: Use Node.js
       uses: actions/setup-node@v4
       with:
         node-version: '20'
+
     - name: Install dependencies
       run: npm install
-    - name: Build project
+
+    - name: Build Web Project
       run: npm run build
+
+    - name: Add iOS Platform
+      run: |
+        npx cap add ios
+        npx cap sync ios
+
+    - name: Build iOS App (Archive)
+      run: |
+        xcodebuild -workspace ios/App/App.xcworkspace \
+                   -scheme App \
+                   -configuration Release \
+                   -archivePath App.xcarchive \
+                   archive \
+                   CODE_SIGNING_ALLOWED=NO
+
+    - name: Export IPA (Unsigned for TrollStore)
+      run: |
+        mkdir -p Payload
+        cp -r App.xcarchive/Products/Applications/App.app Payload/
+        zip -r EasyBook.ipa Payload
+        
+    - name: Upload IPA Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: EasyBook-iOS-IPA
+        path: EasyBook.ipa
